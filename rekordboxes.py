@@ -23,11 +23,9 @@ class AutoBorderBoxTool:
         # Box coordinates list
         self.box_coords_list = []
         
-        # Color tolerance and steps
-        self.color_tolerance = 1
-        self.step_size = 1
-        self.max_right_limit = 300
-        
+        # Contract distance for inward bias
+        self.contract_distance = 1  # Move edges inward by 3 pixels to avoid stray colors
+
         # Create control panel window
         self.control_panel = tk.Toplevel(root)
         self.control_panel.title("Control Panel")
@@ -55,21 +53,17 @@ class AutoBorderBoxTool:
             # Clear previous blue box if it exists
             if self.second_box:
                 self.canvas.delete(self.second_box)
-            self.second_box = self.canvas.create_rectangle(*self.box_coords, outline="blue")
+            self.second_box = self.canvas.create_rectangle(*self.apply_inward_bias(self.box_coords), outline="blue")
         else:
             # Clear previous red box if it exists
             if self.current_box:
                 self.canvas.delete(self.current_box)
-            self.current_box = self.canvas.create_rectangle(*self.box_coords, outline="red")
+            self.current_box = self.canvas.create_rectangle(*self.apply_inward_bias(self.box_coords), outline="red")
             # Reset list to only keep two boxes
             self.box_coords_list = []
 
         # Store coordinates for potential merging
         self.box_coords_list.append(self.box_coords)
-
-    def color_difference(self, color1, color2):
-        """Calculate the color difference based on RGB components."""
-        return sum(abs(color1[i] - color2[i]) for i in range(3))
 
     def expand_box(self):
         x, y = self.start_x, self.start_y
@@ -82,21 +76,34 @@ class AutoBorderBoxTool:
         # Initialize box boundaries
         left, right, top, bottom = x, x, y, y
 
-        # Expand in each direction until a color boundary is hit
-        while right < width and right - x < self.max_right_limit and self.color_difference(pixels[right, y][:3], start_color) < self.color_tolerance:
-            right += self.step_size
+        # Expand in each direction based on color matching
+        while right < width and self.color_difference(pixels[right, y][:3], start_color) < 20:
+            right += 1
 
-        while bottom < height and self.color_difference(pixels[x, bottom][:3], start_color) < self.color_tolerance:
-            bottom += self.step_size
+        while bottom < height and self.color_difference(pixels[x, bottom][:3], start_color) < 20:
+            bottom += 1
 
-        while left > 0 and self.color_difference(pixels[left, y][:3], start_color) < self.color_tolerance:
-            left -= self.step_size
+        while left > 0 and self.color_difference(pixels[left, y][:3], start_color) < 20:
+            left -= 1
 
-        while top > 0 and self.color_difference(pixels[x, top][:3], start_color) < self.color_tolerance:
-            top -= self.step_size
+        while top > 0 and self.color_difference(pixels[x, top][:3], start_color) < 20:
+            top -= 1
 
         # Update the box coordinates
         self.box_coords = [left, top, right, bottom]
+
+    def color_difference(self, color1, color2):
+        """Calculate the color difference based on RGB components."""
+        return sum(abs(color1[i] - color2[i]) for i in range(3))
+
+    def apply_inward_bias(self, box_coords):
+        """Contract box edges inward by `contract_distance` pixels to avoid outer colors."""
+        left, top, right, bottom = box_coords
+        left += self.contract_distance
+        top += self.contract_distance
+        right -= self.contract_distance
+        bottom -= self.contract_distance
+        return [left, top, right, bottom]
 
     def merge_boxes(self):
         """Merge the two boxes into a single larger box."""
@@ -109,10 +116,10 @@ class AutoBorderBoxTool:
         box2 = self.box_coords_list[1]
 
         # Calculate combined box coordinates
-        left = min(box1[0], box2[0])
-        top = min(box1[1], box2[1])
-        right = max(box1[2], box2[2])
-        bottom = max(box1[3], box2[3])
+        left = min(box1[0], box2[0]) + self.contract_distance
+        top = min(box1[1], box2[1]) + self.contract_distance
+        right = max(box1[2], box2[2]) - self.contract_distance
+        bottom = max(box1[3], box2[3]) - self.contract_distance
 
         # Clear individual boxes
         if self.current_box:
@@ -133,8 +140,10 @@ class AutoBorderBoxTool:
         os.makedirs(self.folder, exist_ok=True)
         
         if self.box_coords:
-            # Crop the image to the bounding box
-            cropped_image = self.image.crop(self.box_coords)
+            # Apply inward bias before saving
+            coords = self.apply_inward_bias(self.box_coords)
+            # Crop the image to the adjusted bounding box
+            cropped_image = self.image.crop(coords)
             # Save the cropped image
             cropped_image.save(f"{self.folder}/box_{self.start_x}_{self.start_y}.png")
             print(f"Box saved as box_{self.start_x}_{self.start_y}.png")

@@ -3,7 +3,7 @@ This project is for getting Rekordbox to be easily setup as an overlay for OBS i
 
 ## How to use
 ### 1. Choose boxes and sizes
-Run this python script (rekordboxes.py) to choose which parts of the program you want to keep.
+Run this python script (rekordboxes.py) to crop rectangles in rekordbox you want to overlay on your obs.
 
 ### 2. Format
 Format your boxes onto a 16:9 canvas
