@@ -8,6 +8,7 @@ class ImageItem(QtWidgets.QGraphicsPixmapItem):
         self.setAcceptHoverEvents(True)
         self.default_opacity = 1.0
         self.hover_opacity = 0.6
+        self.original_pixmap = pixmap.copy()  # Store the original pixmap
 
     def hoverEnterEvent(self, event):
         self.setOpacity(self.hover_opacity)
@@ -33,10 +34,11 @@ class MainWindow(QtWidgets.QMainWindow):
         self.graphics_view.setScene(self.scene)
 
         # Set scene size with 16:9 aspect ratio and increase size to avoid scrollbars
-        scene_width = 1920  # Increased width
+        scene_width = 1600  # Increased width for larger canvas
         scene_height = int(scene_width * 9 / 16)
         self.scene.setSceneRect(0, 0, scene_width, scene_height)
-        self.graphics_view.setFixedSize(scene_width, scene_height)
+        self.graphics_view.setFixedSize(scene_width + 2, scene_height + 2)  # Adding border to avoid scrollbars
+        self.graphics_view.setAlignment(QtCore.Qt.AlignCenter)  # Center the canvas
 
         # Load images
         self.load_images()
@@ -46,7 +48,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # Set layout
         main_layout = QtWidgets.QVBoxLayout()
-        main_layout.addWidget(self.graphics_view)
+        main_layout.addWidget(self.graphics_view, alignment=QtCore.Qt.AlignHCenter)  # Center horizontally
         main_layout.addWidget(self.image_selector)
         main_layout.addWidget(self.control_panel)
 
@@ -58,14 +60,14 @@ class MainWindow(QtWidgets.QMainWindow):
         for idx, path in enumerate(self.image_paths):
             pixmap = QtGui.QPixmap(path)
             # Scale images initially
-            scale_ratio = 0.3
+            scale_ratio = 0.5  # Increased initial size
             pixmap = pixmap.scaled(int(pixmap.width() * scale_ratio),
                                    int(pixmap.height() * scale_ratio),
                                    QtCore.Qt.KeepAspectRatio, QtCore.Qt.SmoothTransformation)
 
             image_item = ImageItem(pixmap, idx)
             image_item.setFlags(QtWidgets.QGraphicsItem.ItemIsSelectable)
-            image_item.setPos(idx * 300, 100)
+            image_item.setPos(idx * 400, 150)  # Adjusted initial position for better visibility
             self.scene.addItem(image_item)
             self.images.append(image_item)
 
@@ -111,6 +113,21 @@ class MainWindow(QtWidgets.QMainWindow):
         custom_scale_btn.clicked.connect(self.custom_scale_image)
         layout.addWidget(custom_scale_btn, 0, 3)
 
+        # Scale down button
+        scale_down_btn = QtWidgets.QPushButton("Scale Down")
+        scale_down_btn.clicked.connect(self.scale_down_image)
+        layout.addWidget(scale_down_btn, 0, 4)
+
+        # Crop button
+        crop_btn = QtWidgets.QPushButton("Crop Image")
+        crop_btn.clicked.connect(self.crop_image)
+        layout.addWidget(crop_btn, 0, 5)
+
+        # Reset Crop button
+        reset_crop_btn = QtWidgets.QPushButton("Reset Crop")
+        reset_crop_btn.clicked.connect(self.reset_crop_image)
+        layout.addWidget(reset_crop_btn, 0, 6)  # Adjust grid position as needed
+
         # Movement buttons
         move_left_btn = QtWidgets.QPushButton("Move Left")
         move_left_btn.clicked.connect(lambda: self.move_image(-20, 0))
@@ -137,10 +154,15 @@ class MainWindow(QtWidgets.QMainWindow):
         center_vert_btn.clicked.connect(self.center_image_vertically)
         layout.addWidget(center_vert_btn, 2, 1)
 
+        # Snap to canvas button
+        snap_to_canvas_btn = QtWidgets.QPushButton("Snap to Canvas")
+        snap_to_canvas_btn.clicked.connect(self.snap_to_canvas)
+        layout.addWidget(snap_to_canvas_btn, 2, 2)
+
         # Snap to image button
         snap_to_image_btn = QtWidgets.QPushButton("Snap to Image")
         snap_to_image_btn.clicked.connect(self.snap_to_image)
-        layout.addWidget(snap_to_image_btn, 2, 2)
+        layout.addWidget(snap_to_image_btn, 2, 3)
 
         self.control_panel.setLayout(layout)
 
@@ -213,6 +235,47 @@ class MainWindow(QtWidgets.QMainWindow):
                         # Center image after scaling
                         self.center_image()
 
+    def scale_down_image(self):
+        image_item = self.get_selected_image()
+        if image_item:
+            scale_factor = 0.8  # Scale down by 20%
+            pixmap = image_item.pixmap()
+            new_width = int(pixmap.width() * scale_factor)
+            new_height = int(pixmap.height() * scale_factor)
+            pixmap = pixmap.scaled(new_width, new_height, QtCore.Qt.KeepAspectRatio, QtCore.Qt.SmoothTransformation)
+            image_item.setPixmap(pixmap)
+            # Center image after scaling
+            self.center_image()
+
+    def crop_image(self):
+        image_item = self.get_selected_image()
+        if image_item:
+            side, ok = QtWidgets.QInputDialog.getItem(
+                self, "Crop Image", "Select side to crop:", ["top", "bottom", "left", "right"], 0, False)
+            if ok and side:
+                crop_amount, ok = QtWidgets.QInputDialog.getInt(
+                    self, "Crop Amount", f"Enter amount to crop from {side} (in pixels):", 10, 1, 1000, 1)
+                if ok:
+                    pixmap = image_item.pixmap()
+                    rect = pixmap.rect()
+                    if side == 'top':
+                        rect.setTop(rect.top() + crop_amount)
+                    elif side == 'bottom':
+                        rect.setBottom(rect.bottom() - crop_amount)
+                    elif side == 'left':
+                        rect.setLeft(rect.left() + crop_amount)
+                    elif side == 'right':
+                        rect.setRight(rect.right() - crop_amount)
+                    cropped_pixmap = pixmap.copy(rect)
+                    image_item.setPixmap(cropped_pixmap)
+
+    def reset_crop_image(self):
+        image_item = self.get_selected_image()
+        if image_item:
+            image_item.setPixmap(image_item.original_pixmap)
+            # Optionally, re-center the image after resetting
+            self.center_image()
+
     def move_image(self, dx, dy):
         image_item = self.get_selected_image()
         if image_item:
@@ -237,6 +300,26 @@ class MainWindow(QtWidgets.QMainWindow):
             img_height = image_item.pixmap().height()
             y = (scene_height - img_height) / 2
             image_item.setPos(image_item.pos().x(), y)
+
+    def snap_to_canvas(self):
+        image_item = self.get_selected_image()
+        if image_item:
+            side, ok = QtWidgets.QInputDialog.getItem(self, "Snap to Canvas",
+                                                      "Select side to snap to:", ["left", "right", "top", "bottom"], 0, False)
+            if ok and side:
+                if side == 'right':
+                    x = self.scene.sceneRect().width() - image_item.pixmap().width()
+                    y = image_item.pos().y()
+                elif side == 'left':
+                    x = 0
+                    y = image_item.pos().y()
+                elif side == 'top':
+                    x = image_item.pos().x()
+                    y = 0
+                elif side == 'bottom':
+                    x = image_item.pos().x()
+                    y = self.scene.sceneRect().height() - image_item.pixmap().height()
+                image_item.setPos(x, y)
 
     def snap_to_image(self):
         image_item = self.get_selected_image()
