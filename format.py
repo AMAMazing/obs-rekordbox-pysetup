@@ -136,7 +136,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # Rotate button
         rotate_btn = QtWidgets.QPushButton("Rotate Image")
-        rotate_btn.clicked.connect(self.rotate_image)
+        rotate_btn.clicked.connect(lambda: self.rotate_image())
         layout.addWidget(rotate_btn, 0, 0)
 
         # Scale buttons
@@ -150,7 +150,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # Custom scale button
         custom_scale_btn = QtWidgets.QPushButton("Custom Scale")
-        custom_scale_btn.clicked.connect(self.custom_scale_image)
+        custom_scale_btn.clicked.connect(lambda: self.custom_scale_image())
         layout.addWidget(custom_scale_btn, 0, 3)
 
         # Scale down button
@@ -196,12 +196,12 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # Snap to canvas button
         snap_to_canvas_btn = QtWidgets.QPushButton("Snap to Canvas")
-        snap_to_canvas_btn.clicked.connect(self.snap_to_canvas)
+        snap_to_canvas_btn.clicked.connect(lambda: self.snap_to_canvas())
         layout.addWidget(snap_to_canvas_btn, 2, 2)
 
         # Snap to image button
         snap_to_image_btn = QtWidgets.QPushButton("Snap to Image")
-        snap_to_image_btn.clicked.connect(self.snap_to_image)
+        snap_to_image_btn.clicked.connect(lambda: self.snap_to_image())
         layout.addWidget(snap_to_image_btn, 2, 3)
 
         self.control_panel.setLayout(layout)
@@ -237,7 +237,7 @@ class MainWindow(QtWidgets.QMainWindow):
             QtWidgets.QMessageBox.warning(self, "No Image Selected", "Please select an image to manipulate.")
             return None
 
-    def rotate_image(self, angle=90):
+    def rotate_image(self, angle=90, *args):
         image_item = self.get_selected_image()
         if image_item:
             pixmap = image_item.pixmap().transformed(QtGui.QTransform().rotate(angle), QtCore.Qt.SmoothTransformation)
@@ -329,6 +329,10 @@ class MainWindow(QtWidgets.QMainWindow):
                 rect.setLeft(rect.left() + crop_amount)
             elif side == 'right':
                 rect.setRight(rect.right() - crop_amount)
+            else:
+                QtWidgets.QMessageBox.warning(self, "Invalid Side",
+                                              f"Invalid side '{side}' for cropping. Please choose 'left', 'right', 'top', or 'bottom'.")
+                return
             cropped_pixmap = pixmap.copy(rect)
             image_item.setPixmap(cropped_pixmap)
             self.log_command(f"Cropped {crop_amount}px from {side} of Image {self.selected_image_index + 1}")
@@ -389,6 +393,10 @@ class MainWindow(QtWidgets.QMainWindow):
             elif side == 'bottom':
                 x = image_item.pos().x()
                 y = self.scene.sceneRect().height() - image_item.pixmap().height()
+            else:
+                QtWidgets.QMessageBox.warning(self, "Invalid Side",
+                                              f"Invalid side '{side}' for snapping to canvas. Please choose 'left', 'right', 'top', or 'bottom'.")
+                return
             image_item.setPos(x, y)
             self.log_command(f"Snapped Image {self.selected_image_index + 1} to canvas {side}")
 
@@ -422,6 +430,10 @@ class MainWindow(QtWidgets.QMainWindow):
             elif side == 'bottom':
                 x = other_image.pos().x()
                 y = other_image.pos().y() + other_image.pixmap().height()
+            else:
+                QtWidgets.QMessageBox.warning(self, "Invalid Side",
+                                              f"Invalid side '{side}' for snapping to image. Please choose 'left', 'right', 'top', or 'bottom'.")
+                return
             image_item.setPos(x, y)
             self.log_command(f"Snapped Image {self.selected_image_index + 1} to {side} of Image {other_index + 1}")
 
@@ -587,12 +599,14 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # Snapped Image X to canvas SIDE
         elif 'Snapped Image ' in command_str and 'to canvas' in command_str:
-            m = re.match(r'Snapped Image (\d+) to canvas (\w+)', command_str)
+            m = re.match(r'Snapped Image (\d+) to canvas (left|right|top|bottom)', command_str)
             if m:
                 index = int(m.group(1)) - 1
                 side = m.group(2)
                 self.select_image(index)
                 self.snap_to_canvas(side=side)
+            else:
+                print(f"Invalid command format: {command_str}")
             return
 
         # Snapped Image X to SIDE of Image Y

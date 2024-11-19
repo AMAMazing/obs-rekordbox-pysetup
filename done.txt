@@ -1,0 +1,140 @@
+Rotated Image 1 by 90 degrees
+Rotated Image 1 by 90 degrees
+Rotated Image 1 by 90 degrees
+Cropped 150px from top of Image 1
+Scaled Image 1 to fit scene height
+Centered Image 1 horizontally
+Centered Image 1 vertically
+Centered Image 1
+Snapped Image 1 to canvas left
+Selected Image 2
+Selected Image 2
+Centered Image 2 horizontally
+Centered Image 2 vertically
+Centered Image 2
+Scaled Image 2 by factor 2.0
+Centered Image 2 horizontally
+Centered Image 2 vertically
+Centered Image 2
+Scaled down Image 2 by 20%
+Centered Image 2 horizontally
+Centered Image 2 vertically
+Centered Image 2
+Scaled down Image 2 by 20%
+Centered Image 2 horizontally
+Centered Image 2 vertically
+Centered Image 2
+Scaled down Image 2 by 20%
+Centered Image 2 horizontally
+Centered Image 2 vertically
+Centered Image 2
+Set dimensions of Image 2 to 32x184
+Centered Image 2 horizontally
+Centered Image 2 vertically
+Centered Image 2
+Set dimensions of Image 2 to 32x184
+Centered Image 2 horizontally
+Centered Image 2 vertically
+Centered Image 2
+Scaled Image 2 by factor 1.5
+Centered Image 2 horizontally
+Centered Image 2 vertically
+Centered Image 2
+Scaled down Image 2 by 20%
+Snapped Image 2 to right of Image 1
+Centered Image 2 vertically
+Selected Image 3
+Selected Image 3
+Selected Image 3
+Selected Image 3
+Selected Image 2
+Selected Image 3
+Selected Image 2
+Selected Image 2
+Selected Image 2
+Selected Image 2
+Selected Image 2
+Selected Image 4
+Rotated Image 4 by 90 degrees
+Scaled Image 4 to fit scene height
+Centered Image 4 horizontally
+Centered Image 4 vertically
+Centered Image 4
+Scaled Image 4 to fit scene height
+Centered Image 4 horizontally
+Centered Image 4 vertically
+Centered Image 4
+Cropped 150px from bottom of Image 4
+Scaled Image 4 to fit scene height
+Centered Image 4 horizontally
+Centered Image 4 vertically
+Centered Image 4
+Rotated Image 4 by 90 degrees
+Rotated Image 4 by 90 degrees
+Selected Image 1
+Centered Image 1 horizontally
+Centered Image 1 vertically
+Centered Image 1
+Reset crop of Image 1
+Rotated Image 1 by 90 degrees
+Rotated Image 1 by 90 degrees
+Rotated Image 1 by 90 degrees
+Scaled Image 1 to fit scene height
+Centered Image 1 horizontally
+Centered Image 1 vertically
+Centered Image 1
+Scaled Image 1 to fit scene height
+Centered Image 1 horizontally
+Centered Image 1 vertically
+Centered Image 1
+Scaled Image 1 to fit scene height
+Centered Image 1 horizontally
+Centered Image 1 vertically
+Centered Image 1
+Scaled Image 1 to fit scene height
+Centered Image 1 horizontally
+Centered Image 1 vertically
+Centered Image 1
+Moved Image 1 by (-20, 0)
+Moved Image 1 by (-20, 0)
+Moved Image 1 by (-20, 0)
+Cropped 150px from top of Image 1
+Scaled Image 1 to fit scene height
+Centered Image 1 horizontally
+Centered Image 1 vertically
+Centered Image 1
+Scaled Image 1 to fit scene height
+Centered Image 1 horizontally
+Centered Image 1 vertically
+Centered Image 1
+Scaled Image 1 to fit scene height
+Centered Image 1 horizontally
+Centered Image 1 vertically
+Centered Image 1
+Moved Image 1 by (-20, 0)
+Moved Image 1 by (-20, 0)
+Moved Image 1 by (-20, 0)
+Snapped Image 1 to canvas left
+Selected Image 4
+Rotated Image 4 by 90 degrees
+Rotated Image 4 by 90 degrees
+Snapped Image 4 to canvas right
+Selected Image 2
+Snapped Image 2 to right of Image 1
+Centered Image 2 vertically
+Selected Image 3
+Selected Image 2
+Centered Image 2 horizontally
+Centered Image 2 vertically
+Centered Image 2
+Set dimensions of Image 2 to 38x220
+Snapped Image 2 to right of Image 1
+Centered Image 2 vertically
+Selected Image 2
+Selected Image 3
+Centered Image 3 horizontally
+Centered Image 3 vertically
+Centered Image 3
+Set dimensions of Image 3 to 38x220
+Snapped Image 3 to left of Image 4
+Centered Image 3 vertically
