@@ -1,64 +1,22 @@
+Rotated Image 1 by 90 degrees
+Rotated Image 1 by 90 degrees
+Rotated Image 1 by 90 degrees
+Scaled Image 1 to fit scene height
+Centered Image 1 horizontally
+Centered Image 1 vertically
+Centered Image 1
+Snapped Image 1 to canvas left
 Selected Image 2
-Scaled Image 2 to fit scene height
-Centered Image 2 horizontally
+Snapped Image 2 to right of Image 1
 Centered Image 2 vertically
-Centered Image 2
-Scaled Image 2 to fit scene width
-Centered Image 2 horizontally
-Centered Image 2 vertically
-Centered Image 2
 Selected Image 3
-Selected Image 2
-Scaled Image 2 to fit scene height
-Centered Image 2 horizontally
-Centered Image 2 vertically
-Centered Image 2
+Selected Image 4
+Rotated Image 4 by 90 degrees
+Scaled Image 4 to fit scene height
+Centered Image 4 horizontally
+Centered Image 4 vertically
+Centered Image 4
+Snapped Image 4 to canvas right
 Selected Image 3
-Scaled Image 3 to fit scene width
-Centered Image 3 horizontally
+Snapped Image 3 to left of Image 4
 Centered Image 3 vertically
-Centered Image 3
-Centered Image 3 horizontally
-Centered Image 3 vertically
-Centered Image 3
-Rotated Image 3 by 90 degrees
-Centered Image 3 horizontally
-Centered Image 3 vertically
-Centered Image 3
-Rotated Image 3 by 90 degrees
-Centered Image 3 horizontally
-Centered Image 3 vertically
-Centered Image 3
-Rotated Image 3 by 90 degrees
-Centered Image 3 horizontally
-Centered Image 3 vertically
-Centered Image 3
-Rotated Image 3 by 90 degrees
-Centered Image 3 horizontally
-Centered Image 3 vertically
-Centered Image 3
-Rotated Image 3 by 90 degrees
-Centered Image 3 horizontally
-Centered Image 3 vertically
-Centered Image 3
-Rotated Image 3 by 90 degrees
-Centered Image 3 horizontally
-Centered Image 3 vertically
-Centered Image 3
-Rotated Image 3 by 90 degrees
-Centered Image 3 horizontally
-Centered Image 3 vertically
-Centered Image 3
-Rotated Image 3 by 90 degrees
-Centered Image 3 horizontally
-Centered Image 3 vertically
-Centered Image 3
-Rotated Image 3 by 90 degrees
-Centered Image 3 horizontally
-Centered Image 3 vertically
-Centered Image 3
-Rotated Image 3 by 90 degrees
-Centered Image 3 horizontally
-Centered Image 3 vertically
-Centered Image 3
-Rotated Image 3 by 90 degrees

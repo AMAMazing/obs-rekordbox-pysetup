@@ -1,4 +1,5 @@
 import sys
+import re
 from PyQt5 import QtCore, QtGui, QtWidgets
 
 class ImageItem(QtWidgets.QGraphicsPixmapItem):
@@ -109,6 +110,12 @@ class MainWindow(QtWidgets.QMainWindow):
             self.selected_image_index = 0
             self.images[0].setSelected(True)
 
+    def reset_images(self):
+        self.scene.clear()
+        self.images = []
+        self.selected_image_index = None
+        self.load_images()
+
     def create_control_panel(self):
         # Image Selector Buttons
         self.image_selector = QtWidgets.QWidget()
@@ -116,7 +123,7 @@ class MainWindow(QtWidgets.QMainWindow):
         selector_label = QtWidgets.QLabel("Select Image:")
         selector_layout.addWidget(selector_label)
 
-        for idx in range(len(self.images)):
+        for idx in range(len(self.image_paths)):
             btn = QtWidgets.QPushButton(f"Image {idx + 1}")
             btn.clicked.connect(lambda _, i=idx: self.select_image(i))
             selector_layout.addWidget(btn)
@@ -230,12 +237,12 @@ class MainWindow(QtWidgets.QMainWindow):
             QtWidgets.QMessageBox.warning(self, "No Image Selected", "Please select an image to manipulate.")
             return None
 
-    def rotate_image(self):
+    def rotate_image(self, angle=90):
         image_item = self.get_selected_image()
         if image_item:
-            pixmap = image_item.pixmap().transformed(QtGui.QTransform().rotate(90), QtCore.Qt.SmoothTransformation)
+            pixmap = image_item.pixmap().transformed(QtGui.QTransform().rotate(angle), QtCore.Qt.SmoothTransformation)
             image_item.setPixmap(pixmap)
-            self.log_command(f"Rotated Image {self.selected_image_index + 1} by 90 degrees")
+            self.log_command(f"Rotated Image {self.selected_image_index + 1} by {angle} degrees")
 
     def scale_image(self, fit_vertical=False):
         image_item = self.get_selected_image()
@@ -252,35 +259,41 @@ class MainWindow(QtWidgets.QMainWindow):
             image_item.setPixmap(pixmap)
             self.center_image()
 
-    def custom_scale_image(self):
+    def custom_scale_image(self, choice=None, scale_factor=None, width=None, height=None):
         image_item = self.get_selected_image()
         if image_item:
-            choice, ok = QtWidgets.QInputDialog.getItem(
-                self, "Custom Scaling", "Choose scaling method:", ["Scale Factor", "Set Dimensions"], 0, False)
-            if ok and choice:
-                if choice == "Scale Factor":
+            if choice is None:
+                choice, ok = QtWidgets.QInputDialog.getItem(
+                    self, "Custom Scaling", "Choose scaling method:", ["Scale Factor", "Set Dimensions"], 0, False)
+                if not ok or not choice:
+                    return
+            if choice == "Scale Factor":
+                if scale_factor is None:
                     scale_factor, ok = QtWidgets.QInputDialog.getDouble(
                         self, "Scale Factor", "Enter scale factor:", 1.0, 0.1, 10.0, 2)
-                    if ok:
-                        pixmap = image_item.pixmap()
-                        new_width = int(pixmap.width() * scale_factor)
-                        new_height = int(pixmap.height() * scale_factor)
-                        pixmap = pixmap.scaled(new_width, new_height, QtCore.Qt.KeepAspectRatio,
-                                               QtCore.Qt.SmoothTransformation)
-                        image_item.setPixmap(pixmap)
-                        self.center_image()
-                        self.log_command(f"Scaled Image {self.selected_image_index + 1} by factor {scale_factor}")
-                elif choice == "Set Dimensions":
+                    if not ok:
+                        return
+                pixmap = image_item.pixmap()
+                new_width = int(pixmap.width() * scale_factor)
+                new_height = int(pixmap.height() * scale_factor)
+                pixmap = pixmap.scaled(new_width, new_height, QtCore.Qt.KeepAspectRatio,
+                                       QtCore.Qt.SmoothTransformation)
+                image_item.setPixmap(pixmap)
+                self.center_image()
+                self.log_command(f"Scaled Image {self.selected_image_index + 1} by factor {scale_factor}")
+            elif choice == "Set Dimensions":
+                if width is None or height is None:
                     width, ok_w = QtWidgets.QInputDialog.getInt(
                         self, "Set Width", "Enter new width:", value=image_item.pixmap().width(), min=1)
                     height, ok_h = QtWidgets.QInputDialog.getInt(
                         self, "Set Height", "Enter new height:", value=image_item.pixmap().height(), min=1)
-                    if ok_w and ok_h:
-                        pixmap = image_item.pixmap().scaled(width, height, QtCore.Qt.IgnoreAspectRatio,
-                                                            QtCore.Qt.SmoothTransformation)
-                        image_item.setPixmap(pixmap)
-                        self.center_image()
-                        self.log_command(f"Set dimensions of Image {self.selected_image_index + 1} to {width}x{height}")
+                    if not (ok_w and ok_h):
+                        return
+                pixmap = image_item.pixmap().scaled(width, height, QtCore.Qt.IgnoreAspectRatio,
+                                                    QtCore.Qt.SmoothTransformation)
+                image_item.setPixmap(pixmap)
+                self.center_image()
+                self.log_command(f"Set dimensions of Image {self.selected_image_index + 1} to {width}x{height}")
 
     def scale_down_image(self):
         image_item = self.get_selected_image()
@@ -294,28 +307,31 @@ class MainWindow(QtWidgets.QMainWindow):
             self.center_image()
             self.log_command(f"Scaled down Image {self.selected_image_index + 1} by 20%")
 
-    def crop_image(self):
+    def crop_image(self, side=None, crop_amount=None):
         image_item = self.get_selected_image()
         if image_item:
-            side, ok = QtWidgets.QInputDialog.getItem(
-                self, "Crop Image", "Select side to crop:", ["top", "bottom", "left", "right"], 0, False)
-            if ok and side:
+            if side is None or crop_amount is None:
+                side, ok = QtWidgets.QInputDialog.getItem(
+                    self, "Crop Image", "Select side to crop:", ["top", "bottom", "left", "right"], 0, False)
+                if not ok or not side:
+                    return
                 crop_amount, ok = QtWidgets.QInputDialog.getInt(
                     self, "Crop Amount", f"Enter amount to crop from {side} (in pixels):", 10, 1, 1000, 1)
-                if ok:
-                    pixmap = image_item.pixmap()
-                    rect = pixmap.rect()
-                    if side == 'top':
-                        rect.setTop(rect.top() + crop_amount)
-                    elif side == 'bottom':
-                        rect.setBottom(rect.bottom() - crop_amount)
-                    elif side == 'left':
-                        rect.setLeft(rect.left() + crop_amount)
-                    elif side == 'right':
-                        rect.setRight(rect.right() - crop_amount)
-                    cropped_pixmap = pixmap.copy(rect)
-                    image_item.setPixmap(cropped_pixmap)
-                    self.log_command(f"Cropped {crop_amount}px from {side} of Image {self.selected_image_index + 1}")
+                if not ok:
+                    return
+            pixmap = image_item.pixmap()
+            rect = pixmap.rect()
+            if side == 'top':
+                rect.setTop(rect.top() + crop_amount)
+            elif side == 'bottom':
+                rect.setBottom(rect.bottom() - crop_amount)
+            elif side == 'left':
+                rect.setLeft(rect.left() + crop_amount)
+            elif side == 'right':
+                rect.setRight(rect.right() - crop_amount)
+            cropped_pixmap = pixmap.copy(rect)
+            image_item.setPixmap(cropped_pixmap)
+            self.log_command(f"Cropped {crop_amount}px from {side} of Image {self.selected_image_index + 1}")
 
     def reset_crop_image(self):
         image_item = self.get_selected_image()
@@ -353,56 +369,61 @@ class MainWindow(QtWidgets.QMainWindow):
             image_item.setPos(image_item.pos().x(), y)
             self.log_command(f"Centered Image {self.selected_image_index + 1} vertically")
 
-    def snap_to_canvas(self):
+    def snap_to_canvas(self, side=None):
         image_item = self.get_selected_image()
         if image_item:
-            side, ok = QtWidgets.QInputDialog.getItem(self, "Snap to Canvas",
-                                                      "Select side to snap to:", ["left", "right", "top", "bottom"], 0, False)
-            if ok and side:
-                if side == 'right':
-                    x = self.scene.sceneRect().width() - image_item.pixmap().width()
-                    y = image_item.pos().y()
-                elif side == 'left':
-                    x = 0
-                    y = image_item.pos().y()
-                elif side == 'top':
-                    x = image_item.pos().x()
-                    y = 0
-                elif side == 'bottom':
-                    x = image_item.pos().x()
-                    y = self.scene.sceneRect().height() - image_item.pixmap().height()
-                image_item.setPos(x, y)
-                self.log_command(f"Snapped Image {self.selected_image_index + 1} to canvas {side}")
+            if side is None:
+                side, ok = QtWidgets.QInputDialog.getItem(self, "Snap to Canvas",
+                                                          "Select side to snap to:", ["left", "right", "top", "bottom"], 0, False)
+                if not ok or not side:
+                    return
+            if side == 'right':
+                x = self.scene.sceneRect().width() - image_item.pixmap().width()
+                y = image_item.pos().y()
+            elif side == 'left':
+                x = 0
+                y = image_item.pos().y()
+            elif side == 'top':
+                x = image_item.pos().x()
+                y = 0
+            elif side == 'bottom':
+                x = image_item.pos().x()
+                y = self.scene.sceneRect().height() - image_item.pixmap().height()
+            image_item.setPos(x, y)
+            self.log_command(f"Snapped Image {self.selected_image_index + 1} to canvas {side}")
 
-    def snap_to_image(self):
+    def snap_to_image(self, other_index=None, side=None):
         image_item = self.get_selected_image()
         if image_item:
-            items = [f"Image {i + 1}" for i in range(len(self.images)) if i != self.selected_image_index]
-            if not items:
-                QtWidgets.QMessageBox.warning(self, "No Other Images", "There are no other images to snap to.")
-                return
-            other_image_str, ok = QtWidgets.QInputDialog.getItem(self, "Snap to Image",
-                                                                 "Select image to snap to:", items, 0, False)
-            if ok and other_image_str:
+            if other_index is None or side is None:
+                items = [f"Image {i + 1}" for i in range(len(self.images)) if i != self.selected_image_index]
+                if not items:
+                    QtWidgets.QMessageBox.warning(self, "No Other Images", "There are no other images to snap to.")
+                    return
+                other_image_str, ok = QtWidgets.QInputDialog.getItem(self, "Snap to Image",
+                                                                     "Select image to snap to:", items, 0, False)
+                if not ok or not other_image_str:
+                    return
                 other_index = int(other_image_str.split(' ')[1]) - 1
                 side, ok = QtWidgets.QInputDialog.getItem(self, "Snap Side",
                                                           "Select side to snap to:", ["left", "right", "top", "bottom"], 0, False)
-                if ok and side:
-                    other_image = self.images[other_index]
-                    if side == 'right':
-                        x = other_image.pos().x() + other_image.pixmap().width()
-                        y = other_image.pos().y()
-                    elif side == 'left':
-                        x = other_image.pos().x() - image_item.pixmap().width()
-                        y = other_image.pos().y()
-                    elif side == 'top':
-                        x = other_image.pos().x()
-                        y = other_image.pos().y() - image_item.pixmap().height()
-                    elif side == 'bottom':
-                        x = other_image.pos().x()
-                        y = other_image.pos().y() + other_image.pixmap().height()
-                    image_item.setPos(x, y)
-                    self.log_command(f"Snapped Image {self.selected_image_index + 1} to {side} of Image {other_index + 1}")
+                if not ok or not side:
+                    return
+            other_image = self.images[other_index]
+            if side == 'right':
+                x = other_image.pos().x() + other_image.pixmap().width()
+                y = other_image.pos().y()
+            elif side == 'left':
+                x = other_image.pos().x() - image_item.pixmap().width()
+                y = other_image.pos().y()
+            elif side == 'top':
+                x = other_image.pos().x()
+                y = other_image.pos().y() - image_item.pixmap().height()
+            elif side == 'bottom':
+                x = other_image.pos().x()
+                y = other_image.pos().y() + other_image.pixmap().height()
+            image_item.setPos(x, y)
+            self.log_command(f"Snapped Image {self.selected_image_index + 1} to {side} of Image {other_index + 1}")
 
     def log_command(self, command_str):
         self.command_history.append(command_str)
@@ -425,12 +446,168 @@ class MainWindow(QtWidgets.QMainWindow):
             try:
                 with open(file_name, 'r') as f:
                     commands = f.read().splitlines()
-                self.command_history = commands
+                # Clear existing commands and images
+                self.command_history = []
                 self.command_list_widget.clear()
-                self.command_list_widget.addItems(commands)
+                self.reset_images()
+                # Execute commands
+                for command in commands:
+                    self.command_history.append(command)
+                    self.command_list_widget.addItem(command)
+                    self.execute_command(command)
                 QtWidgets.QMessageBox.information(self, "Import Successful", "Commands imported successfully.")
             except Exception as e:
                 QtWidgets.QMessageBox.warning(self, "Import Failed", f"An error occurred: {e}")
+
+    def execute_command(self, command_str):
+        # Selected Image X
+        if command_str.startswith('Selected Image '):
+            m = re.match(r'Selected Image (\d+)', command_str)
+            if m:
+                index = int(m.group(1)) - 1
+                self.select_image(index)
+            return
+
+        # Rotated Image X by Y degrees
+        elif command_str.startswith('Rotated Image '):
+            m = re.match(r'Rotated Image (\d+) by (\d+) degrees', command_str)
+            if m:
+                index = int(m.group(1)) - 1
+                angle = int(m.group(2))
+                self.select_image(index)
+                self.rotate_image(angle=angle)
+            return
+
+        # Scaled Image X to fit scene height
+        elif 'to fit scene height' in command_str:
+            m = re.match(r'Scaled Image (\d+) to fit scene height', command_str)
+            if m:
+                index = int(m.group(1)) - 1
+                self.select_image(index)
+                self.scale_image(fit_vertical=True)
+            return
+
+        # Scaled Image X to fit scene width
+        elif 'to fit scene width' in command_str:
+            m = re.match(r'Scaled Image (\d+) to fit scene width', command_str)
+            if m:
+                index = int(m.group(1)) - 1
+                self.select_image(index)
+                self.scale_image(fit_vertical=False)
+            return
+
+        # Scaled Image X by factor Y
+        elif 'Scaled Image ' in command_str and 'by factor' in command_str:
+            m = re.match(r'Scaled Image (\d+) by factor ([\d\.]+)', command_str)
+            if m:
+                index = int(m.group(1)) - 1
+                factor = float(m.group(2))
+                self.select_image(index)
+                self.custom_scale_image(choice='Scale Factor', scale_factor=factor)
+            return
+
+        # Set dimensions of Image X to WxH
+        elif 'Set dimensions of Image ' in command_str:
+            m = re.match(r'Set dimensions of Image (\d+) to (\d+)x(\d+)', command_str)
+            if m:
+                index = int(m.group(1)) - 1
+                width = int(m.group(2))
+                height = int(m.group(3))
+                self.select_image(index)
+                self.custom_scale_image(choice='Set Dimensions', width=width, height=height)
+            return
+
+        # Scaled down Image X by 20%
+        elif 'Scaled down Image ' in command_str:
+            m = re.match(r'Scaled down Image (\d+) by (\d+)%', command_str)
+            if m:
+                index = int(m.group(1)) - 1
+                # Assuming scale down by 20%
+                self.select_image(index)
+                self.scale_down_image()
+            return
+
+        # Cropped Npx from SIDE of Image X
+        elif 'Cropped' in command_str and 'from' in command_str and 'of Image' in command_str:
+            m = re.match(r'Cropped (\d+)px from (\w+) of Image (\d+)', command_str)
+            if m:
+                crop_amount = int(m.group(1))
+                side = m.group(2)
+                index = int(m.group(3)) - 1
+                self.select_image(index)
+                self.crop_image(side=side, crop_amount=crop_amount)
+            return
+
+        # Reset crop of Image X
+        elif 'Reset crop of Image ' in command_str:
+            m = re.match(r'Reset crop of Image (\d+)', command_str)
+            if m:
+                index = int(m.group(1)) - 1
+                self.select_image(index)
+                self.reset_crop_image()
+            return
+
+        # Moved Image X by (dx, dy)
+        elif 'Moved Image ' in command_str and 'by' in command_str:
+            m = re.match(r'Moved Image (\d+) by \((-?\d+), (-?\d+)\)', command_str)
+            if m:
+                index = int(m.group(1)) - 1
+                dx = int(m.group(2))
+                dy = int(m.group(3))
+                self.select_image(index)
+                self.move_image(dx, dy)
+            return
+
+        # Centered Image X
+        elif 'Centered Image ' in command_str and 'horizontally' not in command_str and 'vertically' not in command_str:
+            m = re.match(r'Centered Image (\d+)', command_str)
+            if m:
+                index = int(m.group(1)) - 1
+                self.select_image(index)
+                self.center_image()
+            return
+
+        # Centered Image X horizontally
+        elif 'Centered Image ' in command_str and 'horizontally' in command_str:
+            m = re.match(r'Centered Image (\d+) horizontally', command_str)
+            if m:
+                index = int(m.group(1)) - 1
+                self.select_image(index)
+                self.center_image_horizontally()
+            return
+
+        # Centered Image X vertically
+        elif 'Centered Image ' in command_str and 'vertically' in command_str:
+            m = re.match(r'Centered Image (\d+) vertically', command_str)
+            if m:
+                index = int(m.group(1)) - 1
+                self.select_image(index)
+                self.center_image_vertically()
+            return
+
+        # Snapped Image X to canvas SIDE
+        elif 'Snapped Image ' in command_str and 'to canvas' in command_str:
+            m = re.match(r'Snapped Image (\d+) to canvas (\w+)', command_str)
+            if m:
+                index = int(m.group(1)) - 1
+                side = m.group(2)
+                self.select_image(index)
+                self.snap_to_canvas(side=side)
+            return
+
+        # Snapped Image X to SIDE of Image Y
+        elif 'Snapped Image ' in command_str and 'to' in command_str and 'of Image' in command_str:
+            m = re.match(r'Snapped Image (\d+) to (\w+) of Image (\d+)', command_str)
+            if m:
+                index = int(m.group(1)) - 1
+                side = m.group(2)
+                other_index = int(m.group(3)) - 1
+                self.select_image(index)
+                self.snap_to_image(other_index=other_index, side=side)
+            return
+
+        else:
+            print(f"Unknown command: {command_str}")
 
 def main():
     image_paths = [
