@@ -1,154 +1,193 @@
-import tkinter as tk
-from PIL import Image, ImageTk
 import os
+import time
+import cv2
+import numpy as np
+from obswebsocket import obsws, requests, exceptions
+from dotenv import load_dotenv
+from skimage.metrics import structural_similarity as ssim
+from PIL import Image
 
-class AutoBorderBoxTool:
-    def __init__(self, root, image_path="rekordbox.png"):
-        self.root = root
-        self.image_path = image_path
-        self.image = Image.open(image_path)
-        self.tk_image = ImageTk.PhotoImage(self.image)
-        
-        # Canvas setup
-        self.canvas = tk.Canvas(root, width=self.image.width, height=self.image.height)
-        self.canvas.pack()
-        self.background_image = self.canvas.create_image(0, 0, anchor="nw", image=self.tk_image)
-        
-        self.start_x = None
-        self.start_y = None
-        self.current_box = None
-        self.second_box = None
-        self.folder = "selected_boxes"
-        
-        # Box coordinates list
-        self.box_coords_list = []
-        
-        # Contract distance for inward bias
-        self.contract_distance = 1  # Move edges inward by 3 pixels to avoid stray colors
+# Load environment variables from .env file
+load_dotenv()
 
-        # Create control panel window
-        self.control_panel = tk.Toplevel(root)
-        self.control_panel.title("Control Panel")
-        self.control_panel.geometry("200x100")
-        
-        # Place buttons at the bottom of the control panel
-        button_frame = tk.Frame(self.control_panel)
-        button_frame.pack(side="bottom", fill="x", pady=5)
-        
-        # Save and Merge buttons
-        save_button = tk.Button(button_frame, text="Save Boxes", command=self.save_boxes)
-        save_button.pack(side="left", expand=True)
-        merge_button = tk.Button(button_frame, text="Merge Boxes", command=self.merge_boxes)
-        merge_button.pack(side="right", expand=True)
-        
-        # Bind mouse click to create boxes
-        self.canvas.bind("<Button-1>", self.set_start_point)
+# OBS connection details
+host = "localhost"
+port = 4455
+password = os.getenv("OBS_PASSWORD")
 
-    def set_start_point(self, event):
-        self.start_x, self.start_y = event.x, event.y
-        self.expand_box()
-        
-        # Only allow two boxes to be displayed (one red, one blue)
-        if len(self.box_coords_list) == 1:
-            # Clear previous blue box if it exists
-            if self.second_box:
-                self.canvas.delete(self.second_box)
-            self.second_box = self.canvas.create_rectangle(*self.apply_inward_bias(self.box_coords), outline="blue")
-        else:
-            # Clear previous red box if it exists
-            if self.current_box:
-                self.canvas.delete(self.current_box)
-            self.current_box = self.canvas.create_rectangle(*self.apply_inward_bias(self.box_coords), outline="red")
-            # Reset list to only keep two boxes
-            self.box_coords_list = []
+# Settings
+scene_name = "DJing"  # Name of your OBS scene
+rekordbox_source_names = ["Rekordbox Capture 1", "Rekordbox Capture 2"]  # Add more if needed
+max_iterations = 20
+similarity_threshold = 0.99  # Desired similarity (1.0 is identical)
+adjustment_step = 5  # Pixels to adjust per iteration
 
-        # Store coordinates for potential merging
-        self.box_coords_list.append(self.box_coords)
+# Paths
+target_image_path = "rekordbox.png"  # Image with the selected boxes
 
-    def expand_box(self):
-        x, y = self.start_x, self.start_y
-        width, height = self.image.size
-        pixels = self.image.load()
+# Load target image
+target_image = cv2.imread(target_image_path)
 
-        # Starting color
-        start_color = pixels[x, y][:3]
-        
-        # Initialize box boundaries
-        left, right, top, bottom = x, x, y, y
+# Check if target image is loaded
+if target_image is None:
+    print(f"Failed to load target image from {target_image_path}")
+    exit(1)
 
-        # Expand in each direction based on color matching
-        while right < width and self.color_difference(pixels[right, y][:3], start_color) < 20:
-            right += 1
+# Convert target image to RGB
+target_image = cv2.cvtColor(target_image, cv2.COLOR_BGR2RGB)
 
-        while bottom < height and self.color_difference(pixels[x, bottom][:3], start_color) < 20:
-            bottom += 1
+# Initialize OBS WebSocket
+ws = obsws(host, port, password)
 
-        while left > 0 and self.color_difference(pixels[left, y][:3], start_color) < 20:
-            left -= 1
+try:
+    ws.connect()
+    print("Connected to OBS WebSocket")
 
-        while top > 0 and self.color_difference(pixels[x, top][:3], start_color) < 20:
-            top -= 1
+    # Get canvas size
+    video_info = ws.call(requests.GetVideoInfo())
+    canvas_width = video_info.getBaseWidth()
+    canvas_height = video_info.getBaseHeight()
 
-        # Update the box coordinates
-        self.box_coords = [left, top, right, bottom]
+    # Step 1: Set Rekordbox sources to fit screen centered
+    for source_name in rekordbox_source_names:
+        # Get scene item ID
+        scene_item = ws.call(requests.GetSceneItemId(sceneName=scene_name, sourceName=source_name))
+        scene_item_id = scene_item.getSceneItemId()
 
-    def color_difference(self, color1, color2):
-        """Calculate the color difference based on RGB components."""
-        return sum(abs(color1[i] - color2[i]) for i in range(3))
+        # Reset transform: position at center, scale 1:1, no crop
+        ws.call(requests.SetSceneItemTransform(
+            sceneName=scene_name,
+            sceneItemId=scene_item_id,
+            sceneItemTransform={
+                "positionX": canvas_width / 2,
+                "positionY": canvas_height / 2,
+                "rotation": 0.0,
+                "scaleX": 1.0,
+                "scaleY": 1.0,
+                "cropLeft": 0,
+                "cropRight": 0,
+                "cropTop": 0,
+                "cropBottom": 0,
+                "alignment": 5  # Center alignment
+            }
+        ))
 
-    def apply_inward_bias(self, box_coords):
-        """Contract box edges inward by `contract_distance` pixels to avoid outer colors."""
-        left, top, right, bottom = box_coords
-        left += self.contract_distance
-        top += self.contract_distance
-        right -= self.contract_distance
-        bottom -= self.contract_distance
-        return [left, top, right, bottom]
+    # Iteratively adjust transforms
+    for iteration in range(max_iterations):
+        print(f"\nIteration {iteration + 1}/{max_iterations}")
 
-    def merge_boxes(self):
-        """Merge the two boxes into a single larger box."""
-        if len(self.box_coords_list) < 2:
-            print("Need two boxes to merge.")
-            return
+        # Capture OBS output
+        screenshot_response = ws.call(requests.GetSourceScreenshot(
+            sourceName="Program",
+            embedPictureFormat="png",
+            width=canvas_width,
+            height=canvas_height
+        ))
+        img_data_base64 = screenshot_response.getImageData()
+        img_data = base64.b64decode(img_data_base64)
+        nparr = np.frombuffer(img_data, np.uint8)
+        obs_output_image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        obs_output_image = cv2.cvtColor(obs_output_image, cv2.COLOR_BGR2RGB)
 
-        # Take the two boxes
-        box1 = self.box_coords_list[0]
-        box2 = self.box_coords_list[1]
+        # Compare OBS output to target image
+        similarity = compare_images(target_image, obs_output_image)
+        print(f"Similarity: {similarity:.4f}")
 
-        # Calculate combined box coordinates
-        left = min(box1[0], box2[0]) + self.contract_distance
-        top = min(box1[1], box2[1]) + self.contract_distance
-        right = max(box1[2], box2[2]) - self.contract_distance
-        bottom = max(box1[3], box2[3]) - self.contract_distance
+        if similarity >= similarity_threshold:
+            print("Desired similarity achieved.")
+            break
 
-        # Clear individual boxes
-        if self.current_box:
-            self.canvas.delete(self.current_box)
-        if self.second_box:
-            self.canvas.delete(self.second_box)
+        # Adjust transforms based on comparison
+        adjust_transforms(ws, scene_name, rekordbox_source_names, target_image, obs_output_image, adjustment_step)
 
-        # Draw the merged box in green
-        self.current_box = self.canvas.create_rectangle(left, top, right, bottom, outline="green")
-        self.canvas.update()  # Update canvas after drawing combined box
+        # Wait a moment for OBS to update
+        time.sleep(0.5)
 
-        # Update the stored coordinates for the merged box
-        self.box_coords = [left, top, right, bottom]
-        self.box_coords_list = [self.box_coords]  # Reset to only the merged box
+except exceptions.ConnectionFailure:
+    print("Failed to connect to OBS WebSocket. Check if OBS is open and WebSocket server is enabled.")
 
-    def save_boxes(self):
-        # Create the folder if it doesn't exist
-        os.makedirs(self.folder, exist_ok=True)
-        
-        if self.box_coords:
-            # Apply inward bias before saving
-            coords = self.apply_inward_bias(self.box_coords)
-            # Crop the image to the adjusted bounding box
-            cropped_image = self.image.crop(coords)
-            # Save the cropped image
-            cropped_image.save(f"{self.folder}/box_{self.start_x}_{self.start_y}.png")
-            print(f"Box saved as box_{self.start_x}_{self.start_y}.png")
+finally:
+    try:
+        ws.disconnect()
+        print("Disconnected from OBS WebSocket")
+    except AttributeError:
+        print("No active WebSocket connection to close.")
 
-if __name__ == "__main__":
-    root = tk.Tk()
-    app = AutoBorderBoxTool(root, "rekordbox.png")
-    root.mainloop()
+def compare_images(img1, img2):
+    """
+    Compare two images using Structural Similarity Index (SSIM).
+    Returns a similarity score between 0 and 1.
+    """
+    # Resize images to the same size
+    height = min(img1.shape[0], img2.shape[0])
+    width = min(img1.shape[1], img2.shape[1])
+    img1_resized = cv2.resize(img1, (width, height))
+    img2_resized = cv2.resize(img2, (width, height))
+
+    # Convert to grayscale
+    img1_gray = cv2.cvtColor(img1_resized, cv2.COLOR_RGB2GRAY)
+    img2_gray = cv2.cvtColor(img2_resized, cv2.COLOR_RGB2GRAY)
+
+    # Compute SSIM
+    score, _ = ssim(img1_gray, img2_gray, full=True)
+    return score
+
+def adjust_transforms(ws, scene_name, source_names, target_image, obs_image, step):
+    """
+    Adjust the transforms of Rekordbox sources in OBS based on image comparison.
+    """
+    # Calculate difference image
+    diff_image = cv2.absdiff(target_image, obs_image)
+    diff_gray = cv2.cvtColor(diff_image, cv2.COLOR_RGB2GRAY)
+    _, thresh = cv2.threshold(diff_gray, 50, 255, cv2.THRESH_BINARY)
+    moments = cv2.moments(thresh)
+
+    if moments["m00"] == 0:
+        print("No difference detected.")
+        return
+
+    # Calculate centroid of the difference
+    cX = int(moments["m10"] / moments["m00"])
+    cY = int(moments["m01"] / moments["m00"])
+    print(f"Difference centroid at: ({cX}, {cY})")
+
+    # For each Rekordbox source, adjust the position and scale
+    for source_name in source_names:
+        # Get scene item ID
+        scene_item = ws.call(requests.GetSceneItemId(sceneName=scene_name, sourceName=source_name))
+        scene_item_id = scene_item.getSceneItemId()
+
+        # Get current transform
+        transform_response = ws.call(requests.GetSceneItemTransform(
+            sceneName=scene_name,
+            sceneItemId=scene_item_id
+        ))
+        transform = transform_response.getSceneItemTransform()
+
+        # Adjust position
+        new_positionX = transform['positionX'] - step if cX > canvas_width / 2 else transform['positionX'] + step
+        new_positionY = transform['positionY'] - step if cY > canvas_height / 2 else transform['positionY'] + step
+
+        # Adjust scale
+        new_scaleX = transform['scaleX'] + (step / 100) if moments['mu20'] > moments['mu02'] else transform['scaleX'] - (step / 100)
+        new_scaleY = transform['scaleY'] + (step / 100) if moments['mu02'] > moments['mu20'] else transform['scaleY'] - (step / 100)
+
+        # Set new transform
+        ws.call(requests.SetSceneItemTransform(
+            sceneName=scene_name,
+            sceneItemId=scene_item_id,
+            sceneItemTransform={
+                "positionX": new_positionX,
+                "positionY": new_positionY,
+                "rotation": transform['rotation'],
+                "scaleX": new_scaleX,
+                "scaleY": new_scaleY,
+                "cropLeft": transform['cropLeft'],
+                "cropRight": transform['cropRight'],
+                "cropTop": transform['cropTop'],
+                "cropBottom": transform['cropBottom'],
+                "alignment": transform['alignment']
+            }
+        ))
+
+        print(f"Adjusted '{source_name}': Position ({new_positionX}, {new_positionY}), Scale ({new_scaleX}, {new_scaleY})")
